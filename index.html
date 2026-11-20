@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>자유낙하 운동 실험실</title>
+<style>
+  :root{
+    --bg:#EDEFF2; --panel:#FFFFFF; --ink:#1B2430; --sub:#5B6572;
+    --grid:#C7CDD6; --brass:#A8761F; --teal:#2E6F6A; --ground:#3A3F47;
+    --lcd-bg:#182019; --lcd-fg:#7CE0C4;
+    padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12161C; --panel:#1B212B; --ink:#E8ECF1; --sub:#9AA5B1;
+      --grid:#2A323D; --brass:#D2A24C; --teal:#4FA39C; --ground:#0C0F13;
+      --lcd-bg:#0E1512; --lcd-fg:#8CF0D2;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12161C; --panel:#1B212B; --ink:#E8ECF1; --sub:#9AA5B1;
+    --grid:#2A323D; --brass:#D2A24C; --teal:#4FA39C; --ground:#0C0F13;
+    --lcd-bg:#0E1512; --lcd-fg:#8CF0D2;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Pretendard,sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    padding:28px 16px 40px;
+  }
+  .wrap{width:100%; max-width:980px;}
+  header{margin-bottom:20px;}
+  h1{font-size:22px; font-weight:700; margin:0 0 4px; letter-spacing:-0.01em;}
+  header p{margin:0; color:var(--sub); font-size:14px;}
+
+  .layout{display:grid; grid-template-columns:280px 1fr; gap:16px;}
+  @media (max-width:720px){ .layout{grid-template-columns:1fr;} }
+
+  .card{
+    background:var(--panel); border:1px solid var(--grid); border-radius:10px;
+    padding:18px;
+  }
+
+  .field{margin-bottom:20px;}
+  .field label{display:block; font-size:13px; font-weight:600; margin-bottom:8px;}
+  .numbox{
+    display:flex; align-items:stretch; border:1px solid var(--grid); border-radius:8px;
+    overflow:hidden; background:var(--lcd-bg);
+  }
+  .numbox input[type=number]{
+    flex:1; min-width:0; border:none; background:transparent; color:var(--lcd-fg);
+    font-family:ui-monospace,"SF Mono","Cascadia Code",monospace; font-size:20px; font-weight:600;
+    padding:10px 4px 10px 14px; outline:none; -moz-appearance:textfield;
+  }
+  .numbox input[type=number]::-webkit-outer-spin-button,
+  .numbox input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .numbox select{
+    flex:1; min-width:0; border:none; background:transparent; color:var(--lcd-fg);
+    font-family:ui-monospace,"SF Mono","Cascadia Code",monospace; font-size:17px; font-weight:600;
+    padding:10px 4px 10px 14px; outline:none; appearance:none; -webkit-appearance:none;
+  }
+  .numbox select option{ background:var(--panel); color:var(--ink); }
+  .numbox .unit{
+    display:flex; align-items:center; padding:0 14px; font-size:13px; color:#9fb3ab;
+    font-family:ui-monospace,monospace;
+  }
+  .numbox:focus-within{border-color:var(--brass);}
+  .hint{font-size:11px; color:var(--sub); margin-top:6px;}
+
+  .btnrow{display:flex; gap:8px;}
+  button{
+    flex:1; padding:11px 10px; border-radius:7px; border:none; cursor:pointer;
+    font-size:14px; font-weight:700; font-family:inherit;
+  }
+  #drop{background:var(--teal); color:#fff;}
+  #drop:disabled{opacity:0.5; cursor:default;}
+  #reset{background:transparent; color:var(--ink); border:1px solid var(--grid);}
+
+  .tower-card{padding:0; overflow:hidden; display:flex; flex-direction:column;}
+  .tower{position:relative; height:440px; margin:18px 24px 0 56px;}
+  .tick{position:absolute; left:-40px; width:100%; border-top:1px dashed var(--grid);}
+  .tick span{position:absolute; left:-32px; top:-8px; font-size:11px; color:var(--sub); font-family:ui-monospace,monospace; width:26px; text-align:right;}
+  .rail{position:absolute; left:50%; top:0; bottom:0; width:2px; background:var(--grid); transform:translateX(-50%);}
+  .ball{
+    position:absolute; left:50%; width:26px; height:26px; border-radius:50%; top:0;
+    background:radial-gradient(circle at 32% 28%, #F2F4F6 0%, #B7BFC9 35%, #6E7580 68%, #454B54 100%);
+    box-shadow:0 3px 6px rgba(0,0,0,0.35);
+    transform:translate(-50%,0); transition:box-shadow .15s;
+  }
+  .ball.impact{box-shadow:0 0 0 6px rgba(168,118,31,0.25), 0 3px 6px rgba(0,0,0,0.35);}
+  .ground{
+    height:22px; background:repeating-linear-gradient(135deg,var(--ground),var(--ground) 6px,color-mix(in srgb, var(--ground) 80%, #000) 6px,color-mix(in srgb, var(--ground) 80%, #000) 12px);
+    margin:0 24px;
+  }
+  .groundlabel{text-align:center; font-size:11px; color:var(--sub); padding:8px 0 16px; font-family:ui-monospace,monospace;}
+
+  .readout{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--grid); border-top:1px solid var(--grid);}
+  .cell{background:var(--lcd-bg); padding:14px 10px; text-align:center;}
+  .cell .lab{font-size:11px; color:#9fb3ab; margin-bottom:6px;}
+  .cell .num{font-family:ui-monospace,"SF Mono",monospace; font-size:22px; color:var(--lcd-fg); font-weight:600; letter-spacing:0.02em;}
+
+  .logcard{margin-top:16px;}
+  .logcard h2{font-size:14px; margin:0 0 12px;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th,td{padding:7px 8px; text-align:right; border-bottom:1px solid var(--grid);}
+  th:first-child,td:first-child{text-align:left;}
+  th{color:var(--sub); font-weight:600; font-size:11px;}
+  td{font-family:ui-monospace,monospace;}
+  .empty{color:var(--sub); font-size:13px; padding:8px 2px;}
+  .clearlog{background:none; border:none; color:var(--sub); font-size:12px; text-decoration:underline; cursor:pointer; padding:0; flex:none;}
+  .logcard .head{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
+  .logcard .head h2{margin:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>자유낙하 운동 실험실</h1>
+    <p>초기 높이와 물체 질량을 설정하고 낙하시켜, 위치 에너지가 운동 에너지로 바뀌는 과정을 관찰해 보세요.</p>
+  </header>
+
+  <div class="layout">
+    <div class="card">
+      <div class="field">
+        <label>초기 높이</label>
+        <div class="numbox">
+          <select id="height">
+            <option value="0.2" data-v="2">0.2 m</option>
+            <option value="0.8" data-v="4">0.8 m</option>
+            <option value="1.8" data-v="6">1.8 m</option>
+            <option value="3.2" data-v="8">3.2 m</option>
+            <option value="5" data-v="10" selected>5 m</option>
+            <option value="7.2" data-v="12">7.2 m</option>
+            <option value="9.8" data-v="14">9.8 m</option>
+          </select>
+          <span class="unit">▾</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>물체 질량</label>
+        <div class="numbox">
+          <input type="number" id="mass" min="0.01" max="10" step="0.01" value="1.00" inputmode="decimal">
+          <span class="unit">kg</span>
+        </div>
+        <div class="hint">0.01 kg ~ 10 kg 사이 값을 입력하세요</div>
+      </div>
+      <div class="btnrow">
+        <button id="drop">낙하 시작</button>
+        <button id="reset">초기화</button>
+      </div>
+    </div>
+
+    <div class="card tower-card">
+      <div class="tower" id="tower">
+        <div class="rail"></div>
+        <div class="ball" id="ball"></div>
+      </div>
+      <div class="ground"></div>
+      <div class="groundlabel">지면 (0 m)</div>
+      <div class="readout">
+        <div class="cell"><div class="lab">초기 속도</div><div class="num" id="v0">0 m/s</div></div>
+        <div class="cell"><div class="lab">낙하 시간</div><div class="num" id="tt">0.00 s</div></div>
+        <div class="cell"><div class="lab">최종 속도</div><div class="num" id="vf">-- m/s</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card logcard">
+    <div class="head">
+      <h2>실험 기록</h2>
+      <button class="clearlog" id="clearlog">기록 지우기</button>
+    </div>
+    <table id="logtable" style="display:none">
+      <thead><tr><th>회차</th><th>높이(m)</th><th>질량(kg)</th><th>낙하시간(s)</th><th>최종속도(m/s)</th></tr></thead>
+      <tbody id="logbody"></tbody>
+    </table>
+    <div class="empty" id="logempty">아직 실험 기록이 없습니다. 낙하를 실행하면 결과가 여기에 쌓입니다.</div>
+  </div>
+</div>
+
+<script>
+const G = 10; // 중학교 근사값(10 m/s^2) 사용 — 정수 계산이 쉬워짐
+const TOWER_M = 10; // 눈금 전체 범위(m), 항상 0~10m 고정 눈금
+const heightInput = document.getElementById('height');
+const massInput = document.getElementById('mass');
+const tower = document.getElementById('tower');
+const ball = document.getElementById('ball');
+const dropBtn = document.getElementById('drop');
+const resetBtn = document.getElementById('reset');
+const v0El = document.getElementById('v0');
+const ttEl = document.getElementById('tt');
+const vfEl = document.getElementById('vf');
+const logbody = document.getElementById('logbody');
+const logtable = document.getElementById('logtable');
+const logempty = document.getElementById('logempty');
+let runCount = 0, animId = null;
+
+function buildTicks(){
+  for(let m=0;m<=TOWER_M;m++){
+    const t = document.createElement('div');
+    t.className='tick';
+    t.style.top = ((TOWER_M-m)/TOWER_M*100)+'%';
+    const s = document.createElement('span'); s.textContent = m+'m';
+    t.appendChild(s);
+    tower.appendChild(t);
+  }
+}
+buildTicks();
+
+function towerHeightPx(){ return tower.clientHeight; }
+function yForHeight(h){ // 지면 위 높이 h(m) -> tower 내부 top px
+  return (1 - h/TOWER_M) * towerHeightPx();
+}
+
+function clamp(input, min, max, decimals){
+  let v = parseFloat(input.value);
+  if(isNaN(v)) v = min;
+  v = Math.min(max, Math.max(min, v));
+  input.value = v.toFixed(decimals);
+  return v;
+}
+function placeBallAtStart(){
+  const h = parseFloat(heightInput.value) || 0.2;
+  ball.style.top = yForHeight(h)+'px';
+  ball.classList.remove('impact');
+}
+heightInput.addEventListener('change', ()=>{ if(!animId) placeBallAtStart(); });
+massInput.addEventListener('change', ()=>{ clamp(massInput,0.01,10,2); });
+window.addEventListener('load', placeBallAtStart);
+window.addEventListener('resize', ()=>{ if(!animId) placeBallAtStart(); });
+
+function runDrop(){
+  const opt = heightInput.selectedOptions[0];
+  const h = parseFloat(opt.value);
+  const v = parseInt(opt.dataset.v, 10);
+  const m = clamp(massInput,0.01,10,2);
+  const tTotal = v / G;   // h = v²/(2g) 로 미리 골라둔 값이므로 완전히 정확 (반올림 없음)
+  const vFinal = v;
+
+  dropBtn.disabled = true;
+  v0El.textContent = '0 m/s';
+  vfEl.textContent = '-- m/s';
+  ball.classList.remove('impact');
+
+  const start = performance.now();
+  function frame(now){
+    const t = (now-start)/1000;
+    if(t >= tTotal){
+      ball.style.top = yForHeight(0)+'px';
+      ball.classList.add('impact');
+      ttEl.textContent = tTotal.toFixed(2)+' s';
+      vfEl.textContent = vFinal+' m/s';
+      dropBtn.disabled = false;
+      animId = null;
+      addLog(h,m,tTotal,vFinal);
+      return;
+    }
+    const fallen = 0.5*G*t*t;
+    const remain = Math.max(h - fallen, 0);
+    ball.style.top = yForHeight(remain)+'px';
+    ttEl.textContent = t.toFixed(2)+' s';
+    animId = requestAnimationFrame(frame);
+  }
+  animId = requestAnimationFrame(frame);
+}
+
+function addLog(h,m,t,v){
+  runCount++;
+  logempty.style.display='none';
+  logtable.style.display='table';
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${runCount}</td><td>${h}</td><td>${m.toFixed(2)}</td><td>${t.toFixed(2)}</td><td>${v}</td>`;
+  logbody.appendChild(tr);
+}
+
+dropBtn.addEventListener('click', ()=>{ if(!animId) runDrop(); });
+resetBtn.addEventListener('click', ()=>{
+  if(animId){ cancelAnimationFrame(animId); animId=null; }
+  dropBtn.disabled=false;
+  placeBallAtStart();
+  v0El.textContent='0 m/s'; ttEl.textContent='0.00 s'; vfEl.textContent='-- m/s';
+});
+document.getElementById('clearlog').addEventListener('click', ()=>{
+  logbody.innerHTML=''; runCount=0;
+  logtable.style.display='none'; logempty.style.display='block';
+});
+</script>
+</body>
+</html>
